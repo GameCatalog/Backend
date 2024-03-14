@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { client } from "../../../client/client.prisma";
-import { encryptData } from "../../../services/encryptService";
+import { decryptData, encryptData } from "../../../services/encryptService";
+import { generateJWT } from "../../../services/jwtService";
 
 const authRouter = Router();
 
@@ -30,4 +31,47 @@ authRouter.post("/signup", async (req, res) => {
   }
 });
 
-export { authRouter }
+authRouter.post("/signin", async (req, res) => {
+  const { email, password } = req.body;
+  try {
+    const user = await client.user.findUnique({
+      where: {
+        email,
+      },
+    });
+    if (!user) {
+      throw new Error("User not found");
+    }
+    const validatePassword = await decryptData({
+      password,
+      storedPassword: user.password,
+    });
+    if (!validatePassword) {
+      throw new Error("Senha incorreta");
+    }
+    const token = generateJWT(user.id);
+    const loggedUser = await client.user.update({
+      where: {
+        id: user.id,
+      },
+      data: {
+        jwt_token: token,
+      },
+    });
+
+    return res.status(200).json({
+      user: {
+        name: loggedUser.name,
+        email: loggedUser.email,
+      },
+      auth: {
+        token: loggedUser.jwt_token,
+      },
+    });
+  } catch (err: any) {
+    return res.status(401).json({ err: err.message });
+  }
+});
+
+export { authRouter };
+
