@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { client } from "../../../client/client.prisma";
+import { verifyToken } from "../../../middlewares/jwt.middleware";
 import { decryptData, encryptData } from "../../../services/encryptService";
 import { generateJWT } from "../../../services/jwtService";
 
@@ -70,6 +71,25 @@ authRouter.post("/signin", async (req, res) => {
     });
   } catch (err: any) {
     return res.status(401).json({ err: err.message });
+  }
+});
+
+authRouter.post("/signout", verifyToken, async (req, res) => {
+  const userId = req.userId;
+  console.log(userId);
+
+  try {
+    await client.user.update({
+      where: {
+        id: userId,
+      },
+      data: {
+        jwt_token: null,
+      },
+    });
+    return res.status(200).send("Logged out");
+  } catch (err: any) {
+    return res.status(400).json({ err: err.message });
   }
 });
 
